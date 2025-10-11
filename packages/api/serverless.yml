@@ -112,12 +112,7 @@ provider:
             - s3:PutObject
             - s3:DeleteObject
           Resource:
-            - Fn::Sub:
-                - ${AssetBucketArn}/*
-                - AssetBucketArn:
-                    Fn::GetAtt:
-                      - AssetBucket
-                      - Arn
+            - arn:aws:s3:::${env:APP_NAME}-${opt:stage}-asset/*
 resources:
   - ${file(./src/baseblocks/cognito/cognito-resources.yml)}
   - ${file(./src/baseblocks/admin/admin-dynamodb.yml)}
