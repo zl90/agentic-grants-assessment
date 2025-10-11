@@ -23,6 +23,7 @@
     "@aws-amplify/ui-react": "6.5.5",
     "@baseline/client-api": "workspace:1.0.0",
     "@baseline/types": "workspace:1.0.0",
+    "@baseline/components": "workspace:1.0.0",
     "@vitejs/plugin-react": "4.3.4",
     "aws-amplify": "6.6.6",
     "axios": "1.7.7",
