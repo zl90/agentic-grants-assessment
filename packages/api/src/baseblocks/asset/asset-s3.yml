@@ -1,29 +1,39 @@
-Resources:
-  AssetBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: ${env:APP_NAME}-${opt:stage}-asset
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      CorsConfiguration:
-        CorsRules:
-          - AllowedOrigins:
-              - '*'
-            AllowedMethods:
-              - GET
-              - PUT
-              - POST
-              - DELETE
-              - HEAD
-            AllowedHeaders:
-              - '*'
-            ExposedHeaders:
-              - ETag
-              - x-amz-request-id
-              - x-amz-id-2
-      OwnershipControls:
-        Rules:
-          - ObjectOwnership: BucketOwnerEnforced
+# Note: The AssetBucket already exists and is not managed by this CloudFormation template.
+# It is referenced by the AssetS3Trigger function in asset-functions.yml with existing: true.
+# The S3 trigger Lambda will be configured to work with the existing bucket.
+# If you need to recreate the bucket, you must:
+# 1. Manually delete it from AWS S3 console
+# 2. Uncomment the resource definition below
+# 3. Deploy the stack
+
+Resources: {}
+# Commented out because the bucket already exists:
+# Resources:
+#   AssetBucket:
+#     Type: AWS::S3::Bucket
+#     Properties:
+#       BucketName: ${env:APP_NAME}-${opt:stage}-asset
+#       PublicAccessBlockConfiguration:
+#         BlockPublicAcls: true
+#         BlockPublicPolicy: true
+#         IgnorePublicAcls: true
+#         RestrictPublicBuckets: true
+#       CorsConfiguration:
+#         CorsRules:
+#           - AllowedOrigins:
+#               - '*'
+#             AllowedMethods:
+#               - GET
+#               - PUT
+#               - POST
+#               - DELETE
+#               - HEAD
+#             AllowedHeaders:
+#               - '*'
+#             ExposedHeaders:
+#               - ETag
+#               - x-amz-request-id
+#               - x-amz-id-2
+#       OwnershipControls:
+#         Rules:
+#           - ObjectOwnership: BucketOwnerEnforced

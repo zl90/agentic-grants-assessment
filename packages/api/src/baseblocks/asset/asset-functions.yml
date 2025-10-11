@@ -35,3 +35,11 @@ ApiAsset:
             - X-Amz-Security-Token
             - X-Amz-User-Agent
           allowCredentials: false
+
+AssetS3Trigger:
+  handler: src/baseblocks/asset/asset-s3-trigger.handler
+  events:
+    - s3:
+        bucket: ${env:APP_NAME}-${opt:stage}-asset
+        event: s3:ObjectCreated:*
+        existing: true
