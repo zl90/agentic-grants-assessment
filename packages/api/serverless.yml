@@ -6,6 +6,11 @@ plugins:
   - serverless-offline
 custom:
   apiCorsOrigin: '*'
+  s3:
+    assets:
+      local: ${env:APP_NAME}-staging-asset
+      staging: ${env:APP_NAME}-${opt:stage}-asset
+      prod: ${env:APP_NAME}-${opt:stage}-asset
   deletionPolicy:
     local: Delete
     staging: Delete
@@ -72,6 +77,7 @@ provider:
     NODE_ENV: ${opt:stage}
     API_REGION: ${opt:region}
     API_CORS_ORIGIN: ${self:custom.apiCorsOrigin}
+    ASSET_BUCKET_NAME: ${env:APP_NAME}-${opt:stage}-asset
     COGNITO_USER_POOL_ID:
       Ref: CognitoUserPool
   apiGateway:
@@ -100,10 +106,23 @@ provider:
             - cognito-idp:ListUsers
           Resource:
             - !Sub ${CognitoUserPool.Arn}
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource:
+            - Fn::Sub:
+                - ${AssetBucketArn}/*
+                - AssetBucketArn:
+                    Fn::GetAtt:
+                      - AssetBucket
+                      - Arn
 resources:
   - ${file(./src/baseblocks/cognito/cognito-resources.yml)}
   - ${file(./src/baseblocks/admin/admin-dynamodb.yml)}
   - ${file(./src/baseblocks/asset/asset-dynamodb.yml)}
+  - ${file(./src/baseblocks/asset/asset-s3.yml)}
 functions:
   - ${file(./src/baseblocks/admin/admin-functions.yml)}
   - ${file(./src/baseblocks/asset/asset-functions.yml)}
