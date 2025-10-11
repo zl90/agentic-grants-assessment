@@ -1,0 +1,19 @@
+{
+    "name": "@baseline/components",
+    "version": "1.0.0",
+    "main": "index.js",
+    "dependencies": {
+      "@baseline/types": "workspace:1.0.0",
+      "luxon": "3.5.0",
+      "lodash-es": "4.17.21",
+      "react-toastify": "10.0.4",
+      "react": "18.2.0",
+      "reactstrap": "9.2.2",
+      "axios": "1.7.7"
+    },
+    "scripts": {
+      "lint": "npx eslint '*.ts'",
+      "pretty": "npx prettier --write '*.{ts,tsx,d.ts,js,json,css,scss,md,yml,yaml,html}'"
+    }
+  }
+  
