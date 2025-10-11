@@ -1,55 +1,148 @@
 @use '../../../../styles/global';
 
 .dashboard {
+  min-height: 100vh;
+  padding: 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
   h1 {
-    margin-bottom: 32px;
+    margin: 0 0 2rem 0;
+    color: white;
+    font-size: 2.5rem;
+    font-weight: 700;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .grid {
-    display: grid;
-    grid-gap: 16px;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
 
-    @media screen and (max-width: global.$xl) {
-      grid-template-columns: 1fr;
-    }
+    .uploadSection {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
 
-    .links {
-      a {
-        @include global.mediumFont();
+      h2 {
+        margin: 0 0 1.5rem 0;
+        color: #2d3748;
+        font-size: 1.5rem;
+        font-weight: 600;
         display: flex;
         align-items: center;
-
-        margin-bottom: 16px;
-        padding: 32px;
-        color: #000;
-        text-decoration: none;
-        background: #fff;
-        border: 1px solid #bababa;
+        gap: 0.5rem;
 
         &::before {
-          @include global.mediumFont();
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          margin-right: 16px;
-          color: #fff;
-          font-weight: bold;
-          background: #000;
-          border-radius: 10px;
-          content: '+';
+          content: '📁';
+          font-size: 1.25rem;
         }
       }
     }
 
-    .preview {
-      margin-bottom: 16px;
-      padding: 32px;
-      background: #fff;
-      border: 1px solid #bababa;
+    .assetsSection {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      min-height: 400px;
+
+      h2 {
+        margin: 0 0 1.5rem 0;
+        color: #2d3748;
+        font-size: 1.5rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        &::before {
+          content: '📋';
+          font-size: 1.25rem;
+        }
+      }
+    }
+
+    @media screen and (min-width: 768px) {
+      .uploadSection {
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  // Add some nice animations
+  .uploadSection,
+  .assetsSection {
+    animation: slideInUp 0.6s ease-out;
+  }
+
+  .uploadSection {
+    animation-delay: 0.1s;
+  }
+
+  .assetsSection {
+    animation-delay: 0.2s;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Responsive design
+@media screen and (max-width: 768px) {
+  .dashboard {
+    padding: 1rem;
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .grid {
+      gap: 1.5rem;
+
+      .uploadSection,
+      .assetsSection {
+        padding: 1.5rem;
+        border-radius: 12px;
+
+        h2 {
+          font-size: 1.25rem;
+        }
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .dashboard {
+    padding: 0.75rem;
+
+    h1 {
+      font-size: 1.75rem;
+    }
+
+    .grid {
+      .uploadSection,
+      .assetsSection {
+        padding: 1rem;
+        border-radius: 8px;
+      }
     }
   }
 }

@@ -42,7 +42,7 @@ const formatFileUrl = (fullFilename: string, excludeRandom?: boolean) => {
 };
 
 interface Props {
-  uploadPath: string;
+  uploadPath?: string;
   fileName?: string;
   onAssetsUploaded: (key: string, assetName: string) => Promise<void>;
   onAssetDeleted?: () => Promise<void>;
