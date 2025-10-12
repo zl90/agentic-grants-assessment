@@ -27,6 +27,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "3.675.0",
     "@aws-sdk/client-s3": "3.582.0",
+    "@aws-sdk/client-textract": "3.675.0",
     "@aws-sdk/s3-request-presigner": "3.582.0",
     "@baseline/types": "workspace:1.0.0",
     "@baselinejs/dynamodb": "0.2.4",
