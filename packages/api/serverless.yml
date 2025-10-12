@@ -65,7 +65,7 @@ provider:
     Stage: ${opt:stage}
     Region: ${opt:region}
     Product: Baseline
-  timeout: 30
+  timeout: 900
   architecture: arm64
   memorySize: 2048
   logRetentionInDays: 90
@@ -113,6 +113,13 @@ provider:
             - s3:DeleteObject
           Resource:
             - arn:aws:s3:::${env:APP_NAME}-${opt:stage}-asset/*
+        - Effect: Allow
+          Action:
+            - textract:DetectDocumentText
+            - textract:AnalyzeDocument
+            - textract:StartDocumentTextDetection
+            - textract:GetDocumentTextDetection
+          Resource: '*'
 resources:
   - ${file(./src/baseblocks/cognito/cognito-resources.yml)}
   - ${file(./src/baseblocks/admin/admin-dynamodb.yml)}

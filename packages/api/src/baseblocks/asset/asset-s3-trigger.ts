@@ -1,4 +1,82 @@
 import { S3Event, S3Handler } from 'aws-lambda';
+import {
+    TextractClient,
+    StartDocumentTextDetectionCommand,
+    GetDocumentTextDetectionCommand
+} from '@aws-sdk/client-textract';
+
+const textractClient = new TextractClient({ region: process.env.API_REGION });
+
+/** @desc Processes a document with AWS Textract using asynchronous operations */
+async function processDocumentWithTextract(
+    fileName: string,
+    bucketName: string,
+    objectKey: string,
+    objectSize: number
+): Promise<void> {
+    console.log(`Document details: ${fileName} (${objectSize} bytes)`);
+    console.log(`Using asynchronous Textract processing for: ${fileName}`);
+
+    const startCommand = new StartDocumentTextDetectionCommand({
+        DocumentLocation: {
+            S3Object: {
+                Bucket: bucketName,
+                Name: objectKey,
+            },
+        },
+    });
+
+    const startResponse = await textractClient.send(startCommand);
+    const jobId = startResponse.JobId;
+
+    console.log(`Textract async job started successfully for: ${fileName}`);
+    console.log(`Job ID: ${jobId}`);
+
+    const maxWaitTime = 10 * 60 * 1000; // 10 minutes
+    const pollInterval = 5000; // Poll every 5 seconds
+    const startTime = Date.now();
+
+    let jobComplete = false;
+    let finalResult: any = null;
+
+    while (!jobComplete && (Date.now() - startTime) < maxWaitTime) {
+        try {
+            const getCommand = new GetDocumentTextDetectionCommand({ JobId: jobId });
+            const getResponse = await textractClient.send(getCommand);
+
+            if (getResponse.JobStatus === 'SUCCEEDED') {
+                jobComplete = true;
+                finalResult = getResponse;
+                console.log(`Textract job completed successfully for: ${fileName}`);
+
+                if (getResponse.Blocks && getResponse.Blocks.length > 0) {
+                    const textBlocks = getResponse.Blocks.filter(block => block.BlockType === 'LINE');
+                    const extractedText = textBlocks.map(block => block.Text).join(' ');
+
+                    console.log(`Textract results: Found ${textBlocks.length} text lines, extracted ${extractedText.length} characters`);
+
+                    /** @todo Pass results to AWS Bedrock Agents in next step -> at this point we will need to return the results to the calling function */
+                } else {
+                    console.log(`Textract analysis completed for: ${fileName} - No text blocks found`);
+                }
+            } else if (getResponse.JobStatus === 'FAILED') {
+                jobComplete = true;
+                console.error(`Textract job failed for: ${fileName}`);
+                console.error(`Failure reason: ${getResponse.StatusMessage || 'Unknown'}`);
+            } else {
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+            }
+        } catch (pollError: any) {
+            console.error(`Error polling Textract job for: ${fileName}`, pollError);
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+    }
+
+    if (!jobComplete) {
+        console.warn(`Textract job timeout reached for: ${fileName} (JobId: ${jobId})`);
+        console.warn(`Job may still be processing. Check manually with JobId: ${jobId}`);
+    }
+}
 
 /** @desc Lambda function triggered when an asset is uploaded to the Asset S3 bucket */
 export const handler: S3Handler = async (event: S3Event): Promise<void> => {
@@ -54,13 +132,22 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                 const documentExtensions = ['pdf', 'doc', 'docx', 'txt', 'csv'];
 
                 if (imageExtensions.includes(fileExtension)) {
-                    console.log(`Image file uploaded: ${fileName}`);
+                    console.log(`Image file uploaded: ${fileName} - Skipping processing (not a document)`);
+                    continue;
                 } else if (videoExtensions.includes(fileExtension)) {
-                    console.log(`Video file uploaded: ${fileName}`);
+                    console.log(`Video file uploaded: ${fileName} - Skipping processing (not a document)`);
+                    continue;
                 } else if (documentExtensions.includes(fileExtension)) {
-                    console.log(`Document file uploaded: ${fileName}`);
+                    console.log(`Document file uploaded: ${fileName} - Processing with Textract`);
+
+                    try {
+                        await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize);
+                    } catch (textractError: any) {
+                        console.error(`Textract analysis failed for document: ${fileName}`, textractError);
+                    }
                 } else {
-                    console.log(`Other file type uploaded: ${fileName}`);
+                    console.log(`Other file type uploaded: ${fileName} - Skipping processing (not a document)`);
+                    continue;
                 }
             }
 
