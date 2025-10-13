@@ -8,9 +8,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: assetId
           AttributeType: S
+        - AttributeName: s3Key
+          AttributeType: S
       KeySchema:
         - AttributeName: assetId
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
-      PointInTimeRecoverySpecification: 
+      PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: s3Key-index
+          KeySchema:
+            - AttributeName: s3Key
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL

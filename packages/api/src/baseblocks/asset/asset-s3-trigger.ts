@@ -4,7 +4,7 @@ import {
     StartDocumentTextDetectionCommand,
     GetDocumentTextDetectionCommand
 } from '@aws-sdk/client-textract';
-import { assetService } from './asset.service';
+import { assetService, getAssetByS3Key } from './asset.service';
 import { textractAssetService } from '../textract-asset/textract-asset.service';
 
 const textractClient = new TextractClient({ region: process.env.API_REGION });
@@ -186,11 +186,15 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                     try {
                         let assetIdForDocument: string | undefined;
                         try {
-                            const allAssets = await assetService.getAll();
-                            const matched = allAssets.find((a) => a.s3Key === objectKey);
-                            assetIdForDocument = matched?.assetId;
+                            const results = await getAssetByS3Key(objectKey);
+                            if (results && results.length > 0) {
+                                if (results.length > 1) {
+                                    console.warn(`Multiple Assets found with s3Key ${objectKey}. Using the first result.`);
+                                }
+                                assetIdForDocument = results[0].assetId;
+                            }
                         } catch (resolveError: any) {
-                            console.error('Failed to resolve assetId for S3 object', resolveError);
+                            console.error('Failed to resolve assetId for S3 object via s3Key-index', resolveError);
                         }
 
                         if (!assetIdForDocument) {
