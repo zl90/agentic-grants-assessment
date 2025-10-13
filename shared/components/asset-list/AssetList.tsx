@@ -187,37 +187,41 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
           <div className={styles.assetsGrid}>
             {assets.map((asset) => (
               <div key={asset.assetId} className={styles.assetCard}>
-                <div className={styles.assetIcon}>
-                  {getAssetIcon(asset.type)}
-                </div>
-                <div className={styles.assetInfo}>
-                  <div className={styles.assetName} title={asset.name}>
-                    {asset.name}
+                <div className={styles.assetMainRow}>
+                  <div className={styles.assetIcon}>
+                    {getAssetIcon(asset.type)}
                   </div>
-                  <div className={styles.assetMeta}>
-                    <span className={styles.assetType}>{asset.type}</span>
-                    <span className={styles.assetDate}>
-                      {formatDate(asset.createdAt)}
-                    </span>
+                  <div className={styles.assetInfo}>
+                    <div className={styles.assetName} title={asset.name}>
+                      {asset.name}
+                    </div>
+                    <div className={styles.assetMeta}>
+                      <span className={styles.assetType}>{asset.type}</span>
+                      <span className={styles.assetDate}>
+                        {formatDate(asset.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.assetActions}>
+                    <button
+                      onClick={() => handleDownloadAsset(asset)}
+                      className={styles.downloadButton}
+                      title="Download"
+                    >
+                      ⬇️
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDeleteAsset(asset.assetId, asset.name)
+                      }
+                      className={styles.deleteButton}
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
-                <div className={styles.assetActions}>
-                  <button
-                    onClick={() => handleDownloadAsset(asset)}
-                    className={styles.downloadButton}
-                    title="Download"
-                  >
-                    ⬇️
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAsset(asset.assetId, asset.name)}
-                    className={styles.deleteButton}
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
-                <div>
+                <div className={styles.statusRow}>
                   <AssetStatusBadge
                     assetId={asset.assetId}
                     assetType={asset.type}
