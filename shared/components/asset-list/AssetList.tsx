@@ -125,24 +125,26 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
         },
       );
 
-      if (error || (textractAssets && textractAssets.length === 0)) {
-        return <span className={styles.statusBadgeFailed}>FAILED</span>;
-      }
-
-      if (!textractAssets) {
-        return <span className={styles.statusBadgeLoading}>...</span>;
+      if (error || !textractAssets || textractAssets.length === 0) {
+        return <span className={styles.statusBadgeLoading}>Processing...</span>;
       }
 
       const textractAsset = textractAssets[0];
 
-      const statusClass =
-        textractAsset.status === 'COMPLETED'
-          ? styles.statusBadgeCompleted
-          : textractAsset.status === 'IN_PROGRESS'
-          ? styles.statusBadgeInProgress
-          : styles.statusBadgeFailed;
+      let statusClass = styles.statusBadgeLoading;
+      let statusText = 'Processing...';
+      if (textractAsset.status === 'COMPLETED') {
+        statusClass = styles.statusBadgeCompleted;
+        statusText = 'Successfully extracted text';
+      } else if (textractAsset.status === 'IN_PROGRESS') {
+        statusClass = styles.statusBadgeInProgress;
+        statusText = 'Extracting text...';
+      } else if (textractAsset.status === 'FAILED') {
+        statusClass = styles.statusBadgeFailed;
+        statusText = 'Failed to extract text';
+      }
 
-      return <span className={statusClass}>{textractAsset.status}</span>;
+      return <span className={statusClass}>{statusText}</span>;
     };
 
     if (loading) {
@@ -194,10 +196,6 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
                   </div>
                   <div className={styles.assetMeta}>
                     <span className={styles.assetType}>{asset.type}</span>
-                    <AssetStatusBadge
-                      assetId={asset.assetId}
-                      assetType={asset.type}
-                    />
                     <span className={styles.assetDate}>
                       {formatDate(asset.createdAt)}
                     </span>
@@ -218,6 +216,12 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
                   >
                     🗑️
                   </button>
+                </div>
+                <div>
+                  <AssetStatusBadge
+                    assetId={asset.assetId}
+                    assetType={asset.type}
+                  />
                 </div>
               </div>
             ))}
