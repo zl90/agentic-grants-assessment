@@ -4,13 +4,17 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
+import useSWR from 'swr';
 import {
   getAllAssets,
   deleteAsset,
   getAssetDownloadSignedUrl,
 } from '../../client-api/asset';
+import { getTextractAssetByAssetId } from '../../client-api/textract-asset';
+import { getRequestHandler } from '../../client-api/request-handler';
 import styles from './AssetList.module.scss';
 import { Asset } from '@baseline/types/asset';
+import { TextractAsset } from '@baseline/types/textract-asset';
 
 interface AssetListProps {
   onAssetDeleted?: () => void;
@@ -100,6 +104,47 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
       }
     };
 
+    const AssetStatusBadge = ({
+      assetId,
+      assetType,
+    }: {
+      assetId: string;
+      assetType: string;
+    }) => {
+      if (assetType !== 'DOCUMENT') {
+        return null;
+      }
+
+      const requestHandler = getRequestHandler();
+      const { data: textractAssets, error } = useSWR<TextractAsset[]>(
+        `textract-asset-${assetId}`,
+        () => getTextractAssetByAssetId(requestHandler, assetId),
+        {
+          refreshInterval: 5000, // Poll every 5 seconds for IN_PROGRESS status
+          revalidateOnFocus: true,
+        },
+      );
+
+      if (error || (textractAssets && textractAssets.length === 0)) {
+        return <span className={styles.statusBadgeFailed}>FAILED</span>;
+      }
+
+      if (!textractAssets) {
+        return <span className={styles.statusBadgeLoading}>...</span>;
+      }
+
+      const textractAsset = textractAssets[0];
+
+      const statusClass =
+        textractAsset.status === 'COMPLETED'
+          ? styles.statusBadgeCompleted
+          : textractAsset.status === 'IN_PROGRESS'
+          ? styles.statusBadgeInProgress
+          : styles.statusBadgeFailed;
+
+      return <span className={statusClass}>{textractAsset.status}</span>;
+    };
+
     if (loading) {
       return (
         <div className={styles.assetList}>
@@ -149,6 +194,10 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
                   </div>
                   <div className={styles.assetMeta}>
                     <span className={styles.assetType}>{asset.type}</span>
+                    <AssetStatusBadge
+                      assetId={asset.assetId}
+                      assetType={asset.type}
+                    />
                     <span className={styles.assetDate}>
                       {formatDate(asset.createdAt)}
                     </span>

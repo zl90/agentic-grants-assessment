@@ -6,7 +6,7 @@ import { TextractAsset } from '@baseline/types/textract-asset';
 import { getErrorMessage } from '../../util/error-message';
 import createApp from '../../util/express-app';
 import createAuthenticatedHandler from '../../util/create-authenticated-handler';
-import { textractAssetService } from './textract-asset.service';
+import { textractAssetService, getTextractAssetByAssetId } from './textract-asset.service';
 
 const app = createApp();
 export const handler = createAuthenticatedHandler(app);
@@ -95,6 +95,23 @@ app.get('/textract-asset/:textractAssetId', [
       console.error(`Failed to get textract asset: ${message}`);
       res.status(400).json({
         error: 'Failed to get textract asset',
+      });
+    }
+  },
+]);
+
+app.get('/textract-asset/asset/:assetId', [
+  isAdmin,
+  async (req: RequestContext, res: Response) => {
+    try {
+      const textractAssets = await getTextractAssetByAssetId(req.params.assetId);
+      const formattedTextractAssets = textractAssets.map(textractAssetMapper);
+      res.json(formattedTextractAssets);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error(`Failed to get textract asset by assetId: ${message}`);
+      res.status(400).json({
+        error: 'Failed to get textract asset by assetId',
       });
     }
   },

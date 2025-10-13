@@ -68,3 +68,18 @@ export const updateTextractAsset = async (
   }
   throw response;
 };
+
+export const getTextractAssetByAssetId = async (
+  requestHandler: RequestHandler,
+  assetId: string,
+): Promise<TextractAsset[]> => {
+  const response = await requestHandler.request<TextractAsset[]>({
+    method: 'GET',
+    url: `textract-asset/asset/${assetId}`,
+    hasAuthentication: true,
+  });
+  if ('data' in response) {
+    return response.data;
+  }
+  throw response;
+};
