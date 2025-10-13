@@ -4,13 +4,17 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
+import useSWR from 'swr';
 import {
   getAllAssets,
   deleteAsset,
   getAssetDownloadSignedUrl,
 } from '../../client-api/asset';
+import { getTextractAssetByAssetId } from '../../client-api/textract-asset';
+import { getRequestHandler } from '../../client-api/request-handler';
 import styles from './AssetList.module.scss';
 import { Asset } from '@baseline/types/asset';
+import { TextractAsset } from '@baseline/types/textract-asset';
 
 interface AssetListProps {
   onAssetDeleted?: () => void;
@@ -100,6 +104,49 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
       }
     };
 
+    const AssetStatusBadge = ({
+      assetId,
+      assetType,
+    }: {
+      assetId: string;
+      assetType: string;
+    }) => {
+      if (assetType !== 'DOCUMENT') {
+        return null;
+      }
+
+      const requestHandler = getRequestHandler();
+      const { data: textractAssets, error } = useSWR<TextractAsset[]>(
+        `textract-asset-${assetId}`,
+        () => getTextractAssetByAssetId(requestHandler, assetId),
+        {
+          refreshInterval: 5000, // Poll every 5 seconds for IN_PROGRESS status
+          revalidateOnFocus: true,
+        },
+      );
+
+      if (error || !textractAssets || textractAssets.length === 0) {
+        return <span className={styles.statusBadgeLoading}>Processing...</span>;
+      }
+
+      const textractAsset = textractAssets[0];
+
+      let statusClass = styles.statusBadgeLoading;
+      let statusText = 'Processing...';
+      if (textractAsset.status === 'COMPLETED') {
+        statusClass = styles.statusBadgeCompleted;
+        statusText = 'Successfully extracted text';
+      } else if (textractAsset.status === 'IN_PROGRESS') {
+        statusClass = styles.statusBadgeInProgress;
+        statusText = 'Extracting text...';
+      } else if (textractAsset.status === 'FAILED') {
+        statusClass = styles.statusBadgeFailed;
+        statusText = 'Failed to extract text';
+      }
+
+      return <span className={statusClass}>{statusText}</span>;
+    };
+
     if (loading) {
       return (
         <div className={styles.assetList}>
@@ -140,35 +187,45 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
           <div className={styles.assetsGrid}>
             {assets.map((asset) => (
               <div key={asset.assetId} className={styles.assetCard}>
-                <div className={styles.assetIcon}>
-                  {getAssetIcon(asset.type)}
-                </div>
-                <div className={styles.assetInfo}>
-                  <div className={styles.assetName} title={asset.name}>
-                    {asset.name}
+                <div className={styles.assetMainRow}>
+                  <div className={styles.assetIcon}>
+                    {getAssetIcon(asset.type)}
                   </div>
-                  <div className={styles.assetMeta}>
-                    <span className={styles.assetType}>{asset.type}</span>
-                    <span className={styles.assetDate}>
-                      {formatDate(asset.createdAt)}
-                    </span>
+                  <div className={styles.assetInfo}>
+                    <div className={styles.assetName} title={asset.name}>
+                      {asset.name}
+                    </div>
+                    <div className={styles.assetMeta}>
+                      <span className={styles.assetType}>{asset.type}</span>
+                      <span className={styles.assetDate}>
+                        {formatDate(asset.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.assetActions}>
+                    <button
+                      onClick={() => handleDownloadAsset(asset)}
+                      className={styles.downloadButton}
+                      title="Download"
+                    >
+                      ⬇️
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDeleteAsset(asset.assetId, asset.name)
+                      }
+                      className={styles.deleteButton}
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
-                <div className={styles.assetActions}>
-                  <button
-                    onClick={() => handleDownloadAsset(asset)}
-                    className={styles.downloadButton}
-                    title="Download"
-                  >
-                    ⬇️
-                  </button>
-                  <button
-                    onClick={() => handleDeleteAsset(asset.assetId, asset.name)}
-                    className={styles.deleteButton}
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
+                <div className={styles.statusRow}>
+                  <AssetStatusBadge
+                    assetId={asset.assetId}
+                    assetType={asset.type}
+                  />
                 </div>
               </div>
             ))}

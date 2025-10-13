@@ -1,25 +1,25 @@
 Resources:
-  assetTable:
+  textractAssetTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: ${self:custom.deletionPolicy.${opt:stage}}
     UpdateReplacePolicy: ${self:custom.updatePolicy.${opt:stage}}
     Properties:
-      TableName: ${env:APP_NAME}-${opt:stage}-asset
+      TableName: ${env:APP_NAME}-${opt:stage}-textract-asset
       AttributeDefinitions:
-        - AttributeName: assetId
+        - AttributeName: textractAssetId
           AttributeType: S
-        - AttributeName: s3Key
+        - AttributeName: assetId
           AttributeType: S
       KeySchema:
-        - AttributeName: assetId
+        - AttributeName: textractAssetId
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       GlobalSecondaryIndexes:
-        - IndexName: s3Key-index
+        - IndexName: assetId-index
           KeySchema:
-            - AttributeName: s3Key
+            - AttributeName: assetId
               KeyType: HASH
           Projection:
             ProjectionType: ALL

@@ -52,6 +52,9 @@ custom:
           - table: ${env:APP_NAME}-${opt:stage}-asset
             sources:
               - ./src/baseblocks/asset/asset.seed.json
+          - table: ${env:APP_NAME}-${opt:stage}-textract-asset
+            sources:
+              - ./src/baseblocks/textract-asset/textract-asset.seed.json
 package:
   individually: true
 provider:
@@ -99,6 +102,8 @@ provider:
             - !Sub ${adminTable.Arn}/index/*
             - !Sub ${assetTable.Arn}
             - !Sub ${assetTable.Arn}/index/*
+            - !Sub ${textractAssetTable.Arn}
+            - !Sub ${textractAssetTable.Arn}/index/*
         - Effect: Allow
           Action:
             - cognito-idp:AdminCreateUser
@@ -125,6 +130,8 @@ resources:
   - ${file(./src/baseblocks/admin/admin-dynamodb.yml)}
   - ${file(./src/baseblocks/asset/asset-dynamodb.yml)}
   - ${file(./src/baseblocks/asset/asset-s3.yml)}
+  - ${file(./src/baseblocks/textract-asset/textract-asset-dynamodb.yml)}
 functions:
   - ${file(./src/baseblocks/admin/admin-functions.yml)}
   - ${file(./src/baseblocks/asset/asset-functions.yml)}
+  - ${file(./src/baseblocks/textract-asset/textract-asset-functions.yml)}
