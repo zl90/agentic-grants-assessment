@@ -4,6 +4,8 @@ import {
     StartDocumentTextDetectionCommand,
     GetDocumentTextDetectionCommand
 } from '@aws-sdk/client-textract';
+import { assetService } from './asset.service';
+import { textractAssetService } from '../textract-asset/textract-asset.service';
 
 const textractClient = new TextractClient({ region: process.env.API_REGION });
 
@@ -12,7 +14,8 @@ async function processDocumentWithTextract(
     fileName: string,
     bucketName: string,
     objectKey: string,
-    objectSize: number
+    objectSize: number,
+    assetId: string
 ): Promise<void> {
     console.log(`Document details: ${fileName} (${objectSize} bytes)`);
     console.log(`Using asynchronous Textract processing for: ${fileName}`);
@@ -31,6 +34,20 @@ async function processDocumentWithTextract(
 
     console.log(`Textract async job started successfully for: ${fileName}`);
     console.log(`Job ID: ${jobId}`);
+
+    let textractAssetId: string | undefined;
+    try {
+        const created = await textractAssetService.create({
+            assetId,
+            jobId: jobId!,
+            status: 'IN_PROGRESS',
+            startedAt: new Date().toUTCString(),
+        });
+        textractAssetId = (created as any).textractAssetId;
+        console.log(`Created TextractAsset record for job ${jobId} with id ${textractAssetId}`);
+    } catch (createError: any) {
+        console.error('Failed to create TextractAsset record at job start', createError);
+    }
 
     const maxWaitTime = 10 * 60 * 1000; // 10 minutes
     const pollInterval = 5000; // Poll every 5 seconds
@@ -59,10 +76,36 @@ async function processDocumentWithTextract(
                 } else {
                     console.log(`Textract analysis completed for: ${fileName} - No text blocks found`);
                 }
+                if (textractAssetId) {
+                    try {
+                        await textractAssetService.update({
+                            textractAssetId,
+                            status: 'COMPLETED',
+                            completedAt: new Date().toUTCString(),
+                        });
+                        console.log(`Updated TextractAsset ${textractAssetId} as COMPLETED`);
+                    } catch (updateError: any) {
+                        console.error('Failed to update TextractAsset as COMPLETED', updateError);
+                    }
+                }
             } else if (getResponse.JobStatus === 'FAILED') {
                 jobComplete = true;
                 console.error(`Textract job failed for: ${fileName}`);
                 console.error(`Failure reason: ${getResponse.StatusMessage || 'Unknown'}`);
+                if (textractAssetId) {
+                    try {
+                        await textractAssetService.update({
+                            textractAssetId,
+                            status: 'FAILED',
+                            completedAt: new Date().toUTCString(),
+                            errorCode: 'TEXTRACT_JOB_FAILED',
+                            errorMessage: `${getResponse.StatusMessage || 'Unknown'}`,
+                        });
+                        console.log(`Updated TextractAsset ${textractAssetId} as FAILED`);
+                    } catch (updateError: any) {
+                        console.error('Failed to update TextractAsset as FAILED', updateError);
+                    }
+                }
             } else {
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
             }
@@ -141,7 +184,21 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                     console.log(`Document file uploaded: ${fileName} - Processing with Textract`);
 
                     try {
-                        await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize);
+                        let assetIdForDocument: string | undefined;
+                        try {
+                            const allAssets = await assetService.getAll();
+                            const matched = allAssets.find((a) => a.s3Key === objectKey);
+                            assetIdForDocument = matched?.assetId;
+                        } catch (resolveError: any) {
+                            console.error('Failed to resolve assetId for S3 object', resolveError);
+                        }
+
+                        if (!assetIdForDocument) {
+                            console.warn(`No Asset found with s3Key ${objectKey}. Skipping Textract processing for ${fileName}.`);
+                            continue;
+                        }
+
+                        await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize, assetIdForDocument);
                     } catch (textractError: any) {
                         console.error(`Textract analysis failed for document: ${fileName}`, textractError);
                     }
