@@ -83,6 +83,8 @@ provider:
     ASSET_BUCKET_NAME: ${env:APP_NAME}-${opt:stage}-asset
     COGNITO_USER_POOL_ID:
       Ref: CognitoUserPool
+    BEDROCK_AGENT_ROLE_ARN:
+      Ref: BedrockAgentRole
   apiGateway:
     minimumCompressionSize: 1024
   iam:
@@ -125,13 +127,43 @@ provider:
             - textract:StartDocumentTextDetection
             - textract:GetDocumentTextDetection
           Resource: '*'
+        - Effect: Allow
+          Action:
+            - bedrock:CreateAgent
+            - bedrock:GetAgent
+            - bedrock:ListAgents
+            - bedrock:CreateAgentActionGroup
+            - bedrock:CreateAgentAlias
+            - bedrock:InvokeAgent
+            - bedrock:GetAgentAlias
+            - bedrock:ListAgentAliases
+            - bedrock:PrepareAgent
+            - bedrock:UpdateAgent
+            - bedrock:DeleteAgent
+            - bedrock:DeleteAgentAlias
+            - bedrock:DeleteAgentActionGroup
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+            - bedrock:InvokeModelWithResponseStream
+          Resource:
+            - arn:aws:bedrock:*::foundation-model/*
+            - arn:aws:bedrock:${opt:region}:*:*
+        - Effect: Allow
+          Action:
+            - iam:PassRole
+          Resource: !Sub ${BedrockAgentRole.Arn}
 resources:
   - ${file(./src/baseblocks/cognito/cognito-resources.yml)}
   - ${file(./src/baseblocks/admin/admin-dynamodb.yml)}
   - ${file(./src/baseblocks/asset/asset-dynamodb.yml)}
   - ${file(./src/baseblocks/asset/asset-s3.yml)}
+  - ${file(./src/baseblocks/asset/asset-resources.yml)}
   - ${file(./src/baseblocks/textract-asset/textract-asset-dynamodb.yml)}
+  - ${file(./src/baseblocks/bedrock-agent/bedrock-agent-resources.yml)}
 functions:
   - ${file(./src/baseblocks/admin/admin-functions.yml)}
   - ${file(./src/baseblocks/asset/asset-functions.yml)}
   - ${file(./src/baseblocks/textract-asset/textract-asset-functions.yml)}
+  - ${file(./src/baseblocks/bedrock-agent/bedrock-agent-functions.yml)}

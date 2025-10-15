@@ -1,0 +1,90 @@
+Resources:
+  AssetS3TriggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ${env:APP_NAME}-${opt:stage}-asset-s3-trigger-role-v5
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AssetS3TriggerDynamoDBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:BatchGetItem
+                Resource:
+                  - !Sub ${assetTable.Arn}
+                  - !Sub ${assetTable.Arn}/index/*
+                  - !Sub ${textractAssetTable.Arn}
+                  - !Sub ${textractAssetTable.Arn}/index/*
+        - PolicyName: AssetS3TriggerS3Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - arn:aws:s3:::${env:APP_NAME}-${opt:stage}-asset/*
+        - PolicyName: AssetS3TriggerTextractPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - textract:DetectDocumentText
+                  - textract:AnalyzeDocument
+                  - textract:StartDocumentTextDetection
+                  - textract:GetDocumentTextDetection
+                Resource: '*'
+        - PolicyName: AssetS3TriggerBedrockPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:CreateAgent
+                  - bedrock:GetAgent
+                  - bedrock:ListAgents
+                  - bedrock:CreateAgentActionGroup
+                  - bedrock:CreateAgentAlias
+                  - bedrock:InvokeAgent
+                  - bedrock:GetAgentAlias
+                  - bedrock:ListAgentAliases
+                  - bedrock:PrepareAgent
+                  - bedrock:UpdateAgent
+                  - bedrock:DeleteAgent
+                  - bedrock:DeleteAgentAlias
+                  - bedrock:DeleteAgentActionGroup
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - arn:aws:bedrock:*::foundation-model/*
+                  - arn:aws:bedrock:${opt:region}:*:*
+        - PolicyName: AssetS3TriggerIAMPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !Sub ${BedrockAgentRole.Arn}

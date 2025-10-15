@@ -6,8 +6,12 @@ import {
 } from '@aws-sdk/client-textract';
 import { assetService, getAssetByS3Key } from './asset.service';
 import { textractAssetService } from '../textract-asset/textract-asset.service';
+import { invokeClaude } from '../bedrock-agent/bedrock-agent-invoker';
 
 const textractClient = new TextractClient({ region: process.env.API_REGION });
+const AGENT_INSTRUCTION = `You are a Grants Application processing agent. You approve/escalate/deny grant applications based on the application and the instructions provided. If the document is not a grant application, immediately respond with a denial. You base your decisions on the available budget and resources at the disposal of the Australian Federal Government. You must reply with a JSON string containing the following fields:
+{ "result": "APPROVE" | "DENY" | "ESCALATE", "strengths": "a string containing the strengths of the application", "weaknesses": "a string containing the weaknesses of the application", "reason": "a string containing the main reason you made your results decision" }`;
+
 
 /** @desc Processes a document with AWS Textract using asynchronous operations */
 async function processDocumentWithTextract(
@@ -16,7 +20,7 @@ async function processDocumentWithTextract(
     objectKey: string,
     objectSize: number,
     assetId: string
-): Promise<void> {
+): Promise<{ success: boolean; extractedText?: string; errorMessage?: string }> {
     console.log(`Document details: ${fileName} (${objectSize} bytes)`);
     console.log(`Using asynchronous Textract processing for: ${fileName}`);
 
@@ -66,16 +70,16 @@ async function processDocumentWithTextract(
                 finalResult = getResponse;
                 console.log(`Textract job completed successfully for: ${fileName}`);
 
+                let extractedText = '';
                 if (getResponse.Blocks && getResponse.Blocks.length > 0) {
                     const textBlocks = getResponse.Blocks.filter(block => block.BlockType === 'LINE');
-                    const extractedText = textBlocks.map(block => block.Text).join(' ');
+                    extractedText = textBlocks.map(block => block.Text).join(' ');
 
                     console.log(`Textract results: Found ${textBlocks.length} text lines, extracted ${extractedText.length} characters`);
-
-                    /** @todo Pass results to AWS Bedrock Agents in next step -> at this point we will need to return the results to the calling function */
                 } else {
                     console.log(`Textract analysis completed for: ${fileName} - No text blocks found`);
                 }
+
                 if (textractAssetId) {
                     try {
                         await textractAssetService.update({
@@ -88,6 +92,8 @@ async function processDocumentWithTextract(
                         console.error('Failed to update TextractAsset as COMPLETED', updateError);
                     }
                 }
+
+                return { success: true, extractedText };
             } else if (getResponse.JobStatus === 'FAILED') {
                 jobComplete = true;
                 console.error(`Textract job failed for: ${fileName}`);
@@ -106,6 +112,7 @@ async function processDocumentWithTextract(
                         console.error('Failed to update TextractAsset as FAILED', updateError);
                     }
                 }
+                return { success: false, errorMessage: getResponse.StatusMessage || 'Textract job failed' };
             } else {
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
             }
@@ -118,7 +125,10 @@ async function processDocumentWithTextract(
     if (!jobComplete) {
         console.warn(`Textract job timeout reached for: ${fileName} (JobId: ${jobId})`);
         console.warn(`Job may still be processing. Check manually with JobId: ${jobId}`);
+        return { success: false, errorMessage: 'Textract job timeout' };
     }
+
+    return { success: false, errorMessage: 'Unknown error in Textract processing' };
 }
 
 /** @desc Lambda function triggered when an asset is uploaded to the Asset S3 bucket */
@@ -202,7 +212,23 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                             continue;
                         }
 
-                        await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize, assetIdForDocument);
+                        const textractResult = await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize, assetIdForDocument);
+
+                        if (textractResult.success) {
+                            try {
+                                console.log(`Invoking Bedrock Agent for document: ${fileName}`);
+                                console.log(`Textract result text length: ${textractResult.extractedText?.length}`);
+                                console.log("Payload length:", Buffer.byteLength(textractResult.extractedText || '', 'utf8'));
+                                const agentResponse = await invokeClaude(
+                                    `${AGENT_INSTRUCTION}\n\nPlease analyze this grant application document: ${textractResult.extractedText}`
+                                );
+                                console.log(`Bedrock Agent response for ${fileName}: ${agentResponse}`);
+                            } catch (bedrockError: any) {
+                                console.error(`Failed to invoke Bedrock Agent for ${fileName}:`, bedrockError);
+                            }
+                        } else {
+                            console.error(`Textract processing failed for ${fileName}: ${textractResult.errorMessage}`);
+                        }
                     } catch (textractError: any) {
                         console.error(`Textract analysis failed for document: ${fileName}`, textractError);
                     }
