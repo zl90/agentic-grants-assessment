@@ -25,6 +25,10 @@
     "pretty": "npx prettier --write 'src/**/*.{ts,tsx,js,json,css,scss,md,yml,yaml,html}' && npx prettier --write '*.{yml,yaml,js}'"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent": "3.675.0",
+    "@aws-sdk/client-bedrock-agent-runtime": "3.675.0",
+    "@aws-sdk/client-bedrock": "3.675.0",
+    "@aws-sdk/client-bedrock-runtime": "3.675.0",
     "@aws-sdk/client-cognito-identity-provider": "3.675.0",
     "@aws-sdk/client-s3": "3.582.0",
     "@aws-sdk/client-textract": "3.675.0",
