@@ -23,5 +23,9 @@ export async function invokeClaude(prompt: string) {
     const responseBody = Buffer.from(response.body).toString("utf-8");
     const parsed = JSON.parse(responseBody);
 
+    if (parsed.content && parsed.content[0] && parsed.content[0].text) {
+        return parsed.content[0].text;
+    }
+
     return parsed.output_text || parsed.completion || JSON.stringify(parsed);
 }

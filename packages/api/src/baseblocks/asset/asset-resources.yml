@@ -2,7 +2,7 @@ Resources:
   AssetS3TriggerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: ${env:APP_NAME}-${opt:stage}-asset-s3-trigger-role-v5
+      RoleName: ${env:APP_NAME}-${opt:stage}-asset-s3-trigger-role-v6
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -31,6 +31,8 @@ Resources:
                   - !Sub ${assetTable.Arn}/index/*
                   - !Sub ${textractAssetTable.Arn}
                   - !Sub ${textractAssetTable.Arn}/index/*
+                  - !Sub ${bedrockResponseTable.Arn}
+                  - !Sub ${bedrockResponseTable.Arn}/index/*
         - PolicyName: AssetS3TriggerS3Policy
           PolicyDocument:
             Version: '2012-10-17'

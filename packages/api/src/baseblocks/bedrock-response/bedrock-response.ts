@@ -9,6 +9,7 @@ export const bedrockResponseMapper = (data: BedrockResponse): BedrockResponse =>
     reason: data?.reason,
     weaknesses: data?.weaknesses,
     strengths: data?.strengths,
+    status: data?.status,
   };
   return bedrockResponse;
 };

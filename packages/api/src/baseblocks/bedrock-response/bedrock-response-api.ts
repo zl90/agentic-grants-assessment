@@ -15,9 +15,9 @@ app.post('/bedrock-response', [
   isAdmin,
   async (req: RequestContext, res: Response) => {
     try {
-      const { assetId, jobId, decision, reason, weaknesses, strengths } = req.body as BedrockResponse;
+      const { assetId, jobId, decision, reason, weaknesses, strengths, status } = req.body as BedrockResponse;
       const bedrockResponseData: Partial<BedrockResponse> = {
-        assetId, jobId, decision, reason, weaknesses, strengths,
+        assetId, jobId, decision, reason, weaknesses, strengths, status,
       };
       const bedrockResponse = await bedrockResponseService.create(bedrockResponseData);
       res.json(bedrockResponseMapper(bedrockResponse));
@@ -33,9 +33,9 @@ app.patch('/bedrock-response', [
   isAdmin,
   async (req: RequestContext, res: Response) => {
     try {
-      const { bedrockResponseId, assetId, jobId, decision, reason, weaknesses, strengths } = req.body as BedrockResponse;
+      const { bedrockResponseId, assetId, jobId, decision, reason, weaknesses, strengths, status } = req.body as BedrockResponse;
       const bedrockResponseData: Partial<BedrockResponse> = {
-        bedrockResponseId, assetId, jobId, decision, reason, weaknesses, strengths
+        bedrockResponseId, assetId, jobId, decision, reason, weaknesses, strengths, status,
       };
       const bedrockResponse = await bedrockResponseService.update(bedrockResponseData);
       res.json(bedrockResponseMapper(bedrockResponse));
