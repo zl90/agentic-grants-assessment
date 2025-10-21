@@ -10,7 +10,7 @@ import { invokeClaude } from '../bedrock-agent/bedrock-agent-invoker';
 
 const textractClient = new TextractClient({ region: process.env.API_REGION });
 const AGENT_INSTRUCTION = `You are a Grants Application processing agent. You approve/escalate/deny grant applications based on the application and the instructions provided. If the document is not a grant application, immediately respond with a denial. You base your decisions on the available budget and resources at the disposal of the Australian Federal Government. You must reply with a JSON string containing the following fields:
-{ "result": "APPROVE" | "DENY" | "ESCALATE", "strengths": "a string containing the strengths of the application", "weaknesses": "a string containing the weaknesses of the application", "reason": "a string containing the main reason you made your results decision" }`;
+{ "decision": "APPROVE" | "DENY" | "ESCALATE", "strengths": "a string containing the strengths of the application", "weaknesses": "a string containing the weaknesses of the application", "reason": "a string containing the main reason you made your results decision" }`;
 
 
 /** @desc Processes a document with AWS Textract using asynchronous operations */
