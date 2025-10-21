@@ -7,10 +7,62 @@ import {
 import { assetService, getAssetByS3Key } from './asset.service';
 import { textractAssetService } from '../textract-asset/textract-asset.service';
 import { invokeClaude } from '../bedrock-agent/bedrock-agent-invoker';
+import { bedrockResponseService } from '../bedrock-response/bedrock-response.service';
+import { BedrockResponseDecision, BedrockResponseStatus } from '@baseline/types/bedrock-response';
 
 const textractClient = new TextractClient({ region: process.env.API_REGION });
 const AGENT_INSTRUCTION = `You are a Grants Application processing agent. You approve/escalate/deny grant applications based on the application and the instructions provided. If the document is not a grant application, immediately respond with a denial. You base your decisions on the available budget and resources at the disposal of the Australian Federal Government. You must reply with a JSON string containing the following fields:
-{ "result": "APPROVE" | "DENY" | "ESCALATE", "strengths": "a string containing the strengths of the application", "weaknesses": "a string containing the weaknesses of the application", "reason": "a string containing the main reason you made your results decision" }`;
+{ "decision": "APPROVE" | "DENY" | "ESCALATE", "strengths": "a string containing the strengths of the application", "weaknesses": "a string containing the weaknesses of the application", "reason": "a string containing the main reason you made your results decision" }`;
+
+async function updateBedrockResponseRecord(
+    agentResponse: string,
+    bedrockResponseId: string,
+    fileName: string
+): Promise<void> {
+    try {
+        let jsonString = agentResponse.trim();
+
+        const jsonMatch = jsonString.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            jsonString = jsonMatch[0];
+        }
+
+        const parsedResponse = JSON.parse(jsonString);
+        console.log(`Parsed Bedrock response:`, parsedResponse);
+
+        if (!parsedResponse.decision || !parsedResponse.reason) {
+            throw new Error('Invalid response format: missing required fields');
+        }
+
+        const bedrockResponseData = {
+            bedrockResponseId: bedrockResponseId,
+            decision: parsedResponse.decision as BedrockResponseDecision,
+            reason: parsedResponse.reason,
+            weaknesses: parsedResponse.weaknesses || 'No weaknesses identified',
+            strengths: parsedResponse.strengths || 'No strengths identified',
+            status: 'COMPLETED' as BedrockResponseStatus
+        };
+
+        const updatedBedrockResponse = await bedrockResponseService.update(bedrockResponseData);
+        console.log(`Updated BedrockResponse record: ${bedrockResponseId} to COMPLETED`);
+
+    } catch (parseError: any) {
+        console.error(`Failed to parse Bedrock response as JSON for ${fileName}:`, parseError);
+        console.log(`Raw response was: ${agentResponse}`);
+
+        const bedrockResponseData = {
+            bedrockResponseId: bedrockResponseId,
+            decision: 'ERROR' as BedrockResponseDecision,
+            reason: `Failed to parse response: ${agentResponse.substring(0, 500)}...`,
+            weaknesses: 'Response parsing failed',
+            strengths: 'Response parsing failed',
+            status: 'FAILED' as BedrockResponseStatus
+        };
+
+        const updatedBedrockResponse = await bedrockResponseService.update(bedrockResponseData);
+        console.log(`Updated BedrockResponse record: ${bedrockResponseId} to FAILED`);
+    }
+}
 
 
 /** @desc Processes a document with AWS Textract using asynchronous operations */
@@ -20,7 +72,7 @@ async function processDocumentWithTextract(
     objectKey: string,
     objectSize: number,
     assetId: string
-): Promise<{ success: boolean; extractedText?: string; errorMessage?: string }> {
+): Promise<{ success: boolean; extractedText?: string; errorMessage?: string; textractAssetId?: string }> {
     console.log(`Document details: ${fileName} (${objectSize} bytes)`);
     console.log(`Using asynchronous Textract processing for: ${fileName}`);
 
@@ -93,7 +145,7 @@ async function processDocumentWithTextract(
                     }
                 }
 
-                return { success: true, extractedText };
+                return { success: true, extractedText, textractAssetId };
             } else if (getResponse.JobStatus === 'FAILED') {
                 jobComplete = true;
                 console.error(`Textract job failed for: ${fileName}`);
@@ -112,7 +164,7 @@ async function processDocumentWithTextract(
                         console.error('Failed to update TextractAsset as FAILED', updateError);
                     }
                 }
-                return { success: false, errorMessage: getResponse.StatusMessage || 'Textract job failed' };
+                return { success: false, errorMessage: getResponse.StatusMessage || 'Textract job failed', textractAssetId };
             } else {
                 await new Promise(resolve => setTimeout(resolve, pollInterval));
             }
@@ -125,10 +177,10 @@ async function processDocumentWithTextract(
     if (!jobComplete) {
         console.warn(`Textract job timeout reached for: ${fileName} (JobId: ${jobId})`);
         console.warn(`Job may still be processing. Check manually with JobId: ${jobId}`);
-        return { success: false, errorMessage: 'Textract job timeout' };
+        return { success: false, errorMessage: 'Textract job timeout', textractAssetId };
     }
 
-    return { success: false, errorMessage: 'Unknown error in Textract processing' };
+    return { success: false, errorMessage: 'Unknown error in Textract processing', textractAssetId };
 }
 
 /** @desc Lambda function triggered when an asset is uploaded to the Asset S3 bucket */
@@ -215,7 +267,24 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                         const textractResult = await processDocumentWithTextract(fileName!, bucketName, objectKey, objectSize, assetIdForDocument);
 
                         if (textractResult.success) {
+                            let bedrockResponseId: string | undefined;
+
                             try {
+                                console.log(`Creating BedrockResponse record with PENDING status for document: ${fileName}`);
+                                const pendingBedrockResponseData = {
+                                    assetId: assetIdForDocument,
+                                    jobId: textractResult.textractAssetId || `bedrock-${Date.now()}`,
+                                    decision: 'APPROVE' as BedrockResponseDecision,
+                                    reason: 'Processing...',
+                                    weaknesses: 'Processing...',
+                                    strengths: 'Processing...',
+                                    status: 'PENDING' as BedrockResponseStatus
+                                };
+
+                                const createdBedrockResponse = await bedrockResponseService.create(pendingBedrockResponseData);
+                                bedrockResponseId = (createdBedrockResponse as any).bedrockResponseId;
+                                console.log(`Created BedrockResponse record: ${bedrockResponseId} with PENDING status`);
+
                                 console.log(`Invoking Bedrock Agent for document: ${fileName}`);
                                 console.log(`Textract result text length: ${textractResult.extractedText?.length}`);
                                 console.log("Payload length:", Buffer.byteLength(textractResult.extractedText || '', 'utf8'));
@@ -223,8 +292,31 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
                                     `${AGENT_INSTRUCTION}\n\nPlease analyze this grant application document: ${textractResult.extractedText}`
                                 );
                                 console.log(`Bedrock Agent response for ${fileName}: ${agentResponse}`);
+
+                                if (bedrockResponseId) {
+                                    await updateBedrockResponseRecord(
+                                        agentResponse,
+                                        bedrockResponseId,
+                                        fileName!
+                                    );
+                                }
+
                             } catch (bedrockError: any) {
                                 console.error(`Failed to invoke Bedrock Agent for ${fileName}:`, bedrockError);
+
+                                if (bedrockResponseId) {
+                                    try {
+                                        await bedrockResponseService.update({
+                                            bedrockResponseId: bedrockResponseId,
+                                            status: 'FAILED' as BedrockResponseStatus,
+                                            reason: `Bedrock Agent invocation failed: ${bedrockError.message}`,
+                                            decision: 'ERROR' as BedrockResponseDecision
+                                        });
+                                        console.log(`Updated BedrockResponse record: ${bedrockResponseId} to FAILED due to Bedrock error`);
+                                    } catch (updateError: any) {
+                                        console.error(`Failed to update BedrockResponse to FAILED:`, updateError);
+                                    }
+                                }
                             }
                         } else {
                             console.error(`Textract processing failed for ${fileName}: ${textractResult.errorMessage}`);

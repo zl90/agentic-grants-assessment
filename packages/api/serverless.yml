@@ -55,6 +55,9 @@ custom:
           - table: ${env:APP_NAME}-${opt:stage}-textract-asset
             sources:
               - ./src/baseblocks/textract-asset/textract-asset.seed.json
+          - table: ${env:APP_NAME}-${opt:stage}-bedrock-response
+            sources:
+              - ./src/baseblocks/bedrock-response/bedrock-response.seed.json
 package:
   individually: true
 provider:
@@ -106,6 +109,8 @@ provider:
             - !Sub ${assetTable.Arn}/index/*
             - !Sub ${textractAssetTable.Arn}
             - !Sub ${textractAssetTable.Arn}/index/*
+            - !Sub ${bedrockResponseTable.Arn}
+            - !Sub ${bedrockResponseTable.Arn}/index/*
         - Effect: Allow
           Action:
             - cognito-idp:AdminCreateUser
@@ -162,8 +167,10 @@ resources:
   - ${file(./src/baseblocks/asset/asset-resources.yml)}
   - ${file(./src/baseblocks/textract-asset/textract-asset-dynamodb.yml)}
   - ${file(./src/baseblocks/bedrock-agent/bedrock-agent-resources.yml)}
+  - ${file(./src/baseblocks/bedrock-response/bedrock-response-dynamodb.yml)}
 functions:
   - ${file(./src/baseblocks/admin/admin-functions.yml)}
   - ${file(./src/baseblocks/asset/asset-functions.yml)}
   - ${file(./src/baseblocks/textract-asset/textract-asset-functions.yml)}
   - ${file(./src/baseblocks/bedrock-agent/bedrock-agent-functions.yml)}
+  - ${file(./src/baseblocks/bedrock-response/bedrock-response-functions.yml)}
