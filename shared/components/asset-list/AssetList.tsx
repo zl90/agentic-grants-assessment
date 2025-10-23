@@ -5,16 +5,19 @@ import React, {
   useImperativeHandle,
 } from 'react';
 import useSWR from 'swr';
+import { Modal, ModalHeader, ModalBody, ModalFooter, Button } from 'reactstrap';
 import {
   getAllAssets,
   deleteAsset,
   getAssetDownloadSignedUrl,
 } from '../../client-api/asset';
 import { getTextractAssetByAssetId } from '../../client-api/textract-asset';
+import { getBedrockResponseForAsset } from '../../client-api/bedrock-response';
 import { getRequestHandler } from '../../client-api/request-handler';
 import styles from './AssetList.module.scss';
 import { Asset } from '@baseline/types/asset';
 import { TextractAsset } from '@baseline/types/textract-asset';
+import { BedrockResponse } from '@baseline/types/bedrock-response';
 
 interface AssetListProps {
   onAssetDeleted?: () => void;
@@ -29,6 +32,9 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
     const [assets, setAssets] = useState<Asset[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedBedrockResponse, setSelectedBedrockResponse] =
+      useState<BedrockResponse | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const fetchAssets = async () => {
       try {
@@ -147,6 +153,122 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
       return <span className={statusClass}>{statusText}</span>;
     };
 
+    const BedrockStatusBadge = ({
+      assetId,
+      assetType,
+    }: {
+      assetId: string;
+      assetType: string;
+    }) => {
+      if (assetType !== 'DOCUMENT') {
+        return null;
+      }
+
+      const requestHandler = getRequestHandler();
+      const {
+        data: bedrockResponse,
+        error,
+        isLoading,
+      } = useSWR<BedrockResponse>(
+        `bedrock-response-${assetId}`,
+        () => getBedrockResponseForAsset(requestHandler, assetId),
+        {
+          refreshInterval: 5000,
+          revalidateOnFocus: true,
+          shouldRetryOnError: true,
+          errorRetryInterval: 5000,
+        },
+      );
+
+      if (isLoading) {
+        return (
+          <span className={styles.bedrockBadgeLoading}>
+            Checking for AI analysis...
+          </span>
+        );
+      }
+
+      if (error) {
+        console.log(`No bedrock response found for asset ${assetId}:`, error);
+        return (
+          <span className={styles.bedrockBadgeLoading}>
+            Waiting for AI analysis...
+          </span>
+        );
+      }
+
+      if (!bedrockResponse) {
+        return (
+          <span className={styles.bedrockBadgeLoading}>
+            Waiting for AI analysis...
+          </span>
+        );
+      }
+
+      let statusClass = styles.bedrockBadgeLoading;
+      let statusText = 'AI Analysis Pending...';
+
+      if (bedrockResponse.status === 'COMPLETED') {
+        statusClass = styles.bedrockBadgeCompleted;
+        statusText = 'AI Analysis Complete';
+      } else if (bedrockResponse.status === 'PENDING') {
+        statusClass = styles.bedrockBadgePending;
+        statusText = 'AI Analyzing...';
+      } else if (bedrockResponse.status === 'FAILED') {
+        statusClass = styles.bedrockBadgeFailed;
+        statusText = 'AI Analysis Failed';
+      }
+
+      const getDecisionBadge = () => {
+        if (bedrockResponse.status !== 'COMPLETED') return null;
+
+        let decisionClass = styles.decisionBadge;
+        let decisionText = bedrockResponse.decision;
+
+        switch (bedrockResponse.decision) {
+          case 'APPROVE':
+            decisionClass += ` ${styles.decisionApprove}`;
+            break;
+          case 'DENY':
+            decisionClass += ` ${styles.decisionDeny}`;
+            break;
+          case 'ESCALATE':
+            decisionClass += ` ${styles.decisionEscalate}`;
+            break;
+          case 'ERROR':
+            decisionClass += ` ${styles.decisionError}`;
+            break;
+        }
+
+        return <span className={decisionClass}>{decisionText}</span>;
+      };
+
+      return (
+        <div className={styles.bedrockStatusContainer}>
+          <span className={statusClass}>{statusText}</span>
+          {getDecisionBadge()}
+          {bedrockResponse.status === 'COMPLETED' && (
+            <button
+              className={styles.detailsButton}
+              onClick={() => {
+                setSelectedBedrockResponse(bedrockResponse);
+                setIsModalOpen(true);
+              }}
+            >
+              Details
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    const toggleModal = () => {
+      setIsModalOpen(!isModalOpen);
+      if (isModalOpen) {
+        setSelectedBedrockResponse(null);
+      }
+    };
+
     if (loading) {
       return (
         <div className={styles.assetList}>
@@ -227,10 +349,97 @@ const AssetList = forwardRef<AssetListRef, AssetListProps>(
                     assetType={asset.type}
                   />
                 </div>
+                <div className={styles.statusRow}>
+                  <BedrockStatusBadge
+                    assetId={asset.assetId}
+                    assetType={asset.type}
+                  />
+                </div>
               </div>
             ))}
           </div>
         )}
+
+        <Modal isOpen={isModalOpen} toggle={toggleModal} size="lg">
+          <ModalHeader toggle={toggleModal}>AI Analysis Results</ModalHeader>
+          <ModalBody>
+            {selectedBedrockResponse && (
+              <div className={styles.modalContent}>
+                <div className={styles.modalSection}>
+                  <h5 className={styles.modalSectionTitle}>Decision</h5>
+                  <div className={styles.modalField}>
+                    <span
+                      className={`${styles.decisionBadgeLarge} ${
+                        selectedBedrockResponse.decision === 'APPROVE'
+                          ? styles.decisionApprove
+                          : selectedBedrockResponse.decision === 'DENY'
+                          ? styles.decisionDeny
+                          : selectedBedrockResponse.decision === 'ESCALATE'
+                          ? styles.decisionEscalate
+                          : styles.decisionError
+                      }`}
+                    >
+                      {selectedBedrockResponse.decision}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.modalSection}>
+                  <h5 className={styles.modalSectionTitle}>Reason</h5>
+                  <p className={styles.modalText}>
+                    {selectedBedrockResponse.reason || 'No reason provided'}
+                  </p>
+                </div>
+
+                <div className={styles.modalSection}>
+                  <h5 className={styles.modalSectionTitle}>Strengths</h5>
+                  <p className={styles.modalText}>
+                    {selectedBedrockResponse.strengths || 'No strengths listed'}
+                  </p>
+                </div>
+
+                <div className={styles.modalSection}>
+                  <h5 className={styles.modalSectionTitle}>Weaknesses</h5>
+                  <p className={styles.modalText}>
+                    {selectedBedrockResponse.weaknesses ||
+                      'No weaknesses listed'}
+                  </p>
+                </div>
+
+                <div className={styles.modalSection}>
+                  <h5 className={styles.modalSectionTitle}>
+                    Additional Information
+                  </h5>
+                  <div className={styles.modalMetadata}>
+                    <div className={styles.metadataItem}>
+                      <strong>Job ID:</strong>{' '}
+                      <span className={styles.codeText}>
+                        {selectedBedrockResponse.jobId}
+                      </span>
+                    </div>
+                    <div className={styles.metadataItem}>
+                      <strong>Response ID:</strong>{' '}
+                      <span className={styles.codeText}>
+                        {selectedBedrockResponse.bedrockResponseId}
+                      </span>
+                    </div>
+                    <div className={styles.metadataItem}>
+                      <strong>Asset ID:</strong>{' '}
+                      <span className={styles.codeText}>
+                        {selectedBedrockResponse.assetId}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="secondary" onClick={toggleModal}>
+              Close
+            </Button>
+          </ModalFooter>
+        </Modal>
       </div>
     );
   },
